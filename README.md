@@ -1,4 +1,4 @@
-Got it. For the **PPT/demo round**, you only need the simple user flow. You don't need to explain the implementation.
+
 
 # Continuity — Prototype Usage Instructions
 
@@ -98,8 +98,6 @@ Health Timeline
 Previous health history is preserved
 ```
 
-### 🎤 One-line explanation for your presentation
+### 🎤 One-line explanation 
 
 > **"Continuity allows users to record their health experiences naturally and maintains a continuous, organized health history over time."**
-
-That's enough for the prototype round. **Don't spend time setting up the remaining phases right now.** Focus on making this flow work smoothly for your demo.
