@@ -75,14 +75,21 @@ continuity/
 
 ## STEP 6 — Environment variables
 
-Phase 1 doesn't need any API keys yet. Later phases will need a `.env` file:
+Phase 4 needs an Anthropic API key for AI extraction. Create your `.env`:
 
 ```bash
 cp .env.example .env
 ```
 
-Then fill in keys as we add each service. Never commit `.env` — it's already
-in `.gitignore`.
+Then open `.env` and fill in:
+
+```
+LLM_API_KEY=sk-ant-...your key here...
+```
+
+Get a key from https://console.anthropic.com/settings/keys if you don't
+have one. **If you don't set this, the app still works** — it automatically
+falls back to the Phase 3 step-by-step questions instead of crashing.
 
 ## STEP 7 — Run the app
 

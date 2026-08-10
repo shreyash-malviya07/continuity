@@ -25,13 +25,16 @@ from models.schemas import Patient, HealthEvent
 from services.checkin_service import (
     CheckinState,
     new_checkin,
-    submit_feeling,
+    receive_feeling,
+    apply_extraction,
+    fall_back_to_manual,
     submit_symptom,
     submit_severity,
     submit_associated,
     submit_time,
     confirm_edit,
 )
+from services.ai_service import extract_health_event, AIExtractionError
 
 # ----------------------------------------------------------------
 # Page config - do this first, before any other st.* call
@@ -147,6 +150,14 @@ def daily_checkin_page():
         st.session_state.checkin = new_checkin()
     state: CheckinState = st.session_state.checkin
 
+    if st.session_state.get("checkin_ai_error"):
+        st.warning(
+            "AI extraction is unavailable right now "
+            f"({st.session_state.checkin_ai_error}), so we're asking a "
+            "few quick questions instead."
+        )
+        del st.session_state["checkin_ai_error"]
+
     # Render conversation so far as chat bubbles
     for role, text in state.history:
         with st.chat_message("assistant" if role == "ai" else "user"):
@@ -160,7 +171,14 @@ def daily_checkin_page():
                 "and I had difficulty walking this morning."
             ))
             if st.form_submit_button("Send") and text.strip():
-                submit_feeling(state, text)
+                receive_feeling(state, text)
+                with st.spinner("Thinking..."):
+                    try:
+                        extracted = extract_health_event(state.feeling_text)
+                        apply_extraction(state, extracted)
+                    except AIExtractionError as e:
+                        st.session_state.checkin_ai_error = str(e)
+                        fall_back_to_manual(state)
                 st.rerun()
 
     elif state.step == "symptom":
