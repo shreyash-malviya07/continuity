@@ -80,8 +80,6 @@ Then show how these events appear together in the timeline.
 
 ### 6. Demonstrate the main idea
 
-For your PPT/demo, the story is simply:
-
 ```text
 Patient
    ↓
