@@ -1,0 +1,28 @@
+## 🏗️ System Architecture
+
+Continuity follows a modular architecture that separates the user interface,
+application services, persistent health data, and semantic memory.
+
+```text
+User
+  │
+  ▼
+Streamlit Interface
+  │
+  ▼
+Application Services
+  ├── Check-in Service
+  ├── Memory Service
+  └── Health/Report Processing
+  │
+  ├───────────────┐
+  ▼               ▼
+SQLite        Semantic Memory
+  │               │
+  │        Sentence Transformers
+  │               │
+  │          SQLite / Qdrant
+  │               │
+  └───────┬───────┘
+          ▼
+Health Timeline & Reports
