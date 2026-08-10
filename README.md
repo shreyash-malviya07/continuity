@@ -91,6 +91,38 @@ Get a key from https://console.anthropic.com/settings/keys if you don't
 have one. **If you don't set this, the app still works** — it automatically
 falls back to the Phase 3 step-by-step questions instead of crashing.
 
+Phase 5 (semantic memory) can optionally use Qdrant:
+
+```
+QDRANT_URL=http://localhost:6333
+QDRANT_API_KEY=
+```
+
+**If you leave `QDRANT_URL` blank, the app still works** — it automatically
+falls back to storing embeddings locally in SQLite and computing similarity
+itself. You do NOT need to install or run Qdrant to demo this feature.
+
+If you do want real Qdrant, the easiest way is Docker:
+```bash
+docker run -p 6333:6333 qdrant/qdrant
+```
+Then set `QDRANT_URL=http://localhost:6333` in `.env`.
+
+## How Qdrant is used
+
+`services/memory_service.py` embeds each health event's symptom + what the
+patient said (locally, via `sentence-transformers` — no API key needed) and
+stores that vector either in a Qdrant collection called `health_events`
+(if `QDRANT_URL` is set and reachable) or in a local SQLite table
+(`event_embedding`) as a fallback. Either way, `find_related_events()`
+retrieves the closest matches by cosine similarity, so entries like "my
+knee is acting up" and "my leg is sore again" surface as related on the
+Health Timeline, without ever falsely merging unrelated symptoms.
+
+The first time you run a check-in, `sentence-transformers` downloads a
+small model (~80MB) — this needs internet access once, then it's cached
+locally.
+
 ## STEP 7 — Run the app
 
 ```bash

@@ -20,6 +20,7 @@ from database.db import (
     update_patient,
     add_health_event,
     get_all_health_events,
+    get_event_by_id,
 )
 from models.schemas import Patient, HealthEvent
 from services.checkin_service import (
@@ -35,6 +36,7 @@ from services.checkin_service import (
     confirm_edit,
 )
 from services.ai_service import extract_health_event, AIExtractionError
+from services.memory_service import index_event, find_related_events
 
 # ----------------------------------------------------------------
 # Page config - do this first, before any other st.* call
@@ -158,6 +160,13 @@ def daily_checkin_page():
         )
         del st.session_state["checkin_ai_error"]
 
+    if st.session_state.get("memory_index_error"):
+        st.caption(
+            "(Event saved, but semantic memory indexing was skipped: "
+            f"{st.session_state.memory_index_error})"
+        )
+        del st.session_state["memory_index_error"]
+
     # Render conversation so far as chat bubbles
     for role, text in state.history:
         with st.chat_message("assistant" if role == "ai" else "user"):
@@ -227,7 +236,12 @@ def daily_checkin_page():
                     source="patient_reported",
                     raw_text=state.feeling_text,
                 )
-                add_health_event(event)
+                new_id = add_health_event(event)
+                try:
+                    memory_text = f"{state.symptom}. {state.feeling_text}".strip()
+                    index_event(new_id, memory_text)
+                except Exception as e:
+                    st.session_state.memory_index_error = str(e)
                 st.session_state.checkin = new_checkin()
                 st.success("Recorded. Thank you.")
                 st.rerun()
@@ -267,6 +281,24 @@ def timeline_page():
                 st.caption(f"\"{e.raw_text}\"")
             st.caption(f"Source: {e.source}")
 
+            with st.expander("Related past entries"):
+                try:
+                    query = f"{e.symptom}. {e.raw_text or ''}".strip()
+                    related_ids = find_related_events(query, exclude_event_id=e.id)
+                except Exception as ex:
+                    st.caption(f"Semantic memory unavailable: {ex}")
+                    related_ids = []
+
+                if not related_ids:
+                    st.caption("No semantically related entries found.")
+                else:
+                    for rid in related_ids:
+                        related = get_event_by_id(rid)
+                        if related:
+                            st.write(f"• {related.date} — {related.symptom}"
+                                      + (f" ({related.severity}/10)"
+                                         if related.severity else ""))
+
 
 def report_page():
     st.title("Doctor Report")
@@ -300,4 +332,4 @@ PAGE_FUNCS = {
 PAGE_FUNCS[page]()
 
 st.sidebar.divider()
-st.sidebar.caption("Continuity — Phase 3: text-based daily check-in conversation.")
+st.sidebar.caption("Continuity — Phase 5: semantic memory (Qdrant / local fallback).")

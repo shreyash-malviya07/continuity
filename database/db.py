@@ -2,13 +2,14 @@
 SQLite database layer for Continuity.
 
 Everything the app knows about a patient and their patient-reported health
-events lives here. No AI, no Qdrant - just plain storage, so Phase 2 can be
-tested completely on its own.
+events lives here, plus a local fallback table for event embeddings used
+by services/memory_service.py when Qdrant isn't configured or unreachable.
 """
 
+import json
 import sqlite3
 import os
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from models.schemas import Patient, HealthEvent
 
@@ -53,6 +54,17 @@ def init_db() -> None:
             time_of_day TEXT,
             source TEXT NOT NULL DEFAULT 'patient_reported',
             raw_text TEXT
+        )
+        """
+    )
+
+    # Local fallback for semantic memory (Phase 5) - only used when Qdrant
+    # is not configured or unreachable. See services/memory_service.py.
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS event_embedding (
+            event_id INTEGER PRIMARY KEY,
+            embedding TEXT NOT NULL
         )
         """
     )
@@ -178,5 +190,46 @@ def clear_all_health_events() -> None:
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("DELETE FROM health_event")
+    cur.execute("DELETE FROM event_embedding")
     conn.commit()
     conn.close()
+
+
+def get_event_by_id(event_id: int) -> Optional[HealthEvent]:
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM health_event WHERE id = ?", (event_id,))
+    row = cur.fetchone()
+    conn.close()
+
+    if row is None:
+        return None
+
+    return HealthEvent(
+        id=row["id"], date=row["date"], symptom=row["symptom"],
+        severity=row["severity"], associated_issue=row["associated_issue"],
+        time_of_day=row["time_of_day"], source=row["source"],
+        raw_text=row["raw_text"],
+    )
+
+
+def save_event_embedding(event_id: int, embedding: List[float]) -> None:
+    """Local fallback storage for an event's embedding vector."""
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT OR REPLACE INTO event_embedding (event_id, embedding) VALUES (?, ?)",
+        (event_id, json.dumps(embedding)),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_all_event_embeddings() -> List[Tuple[int, List[float]]]:
+    """Local fallback: all stored (event_id, embedding) pairs."""
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT event_id, embedding FROM event_embedding")
+    rows = cur.fetchall()
+    conn.close()
+    return [(row["event_id"], json.loads(row["embedding"])) for row in rows]
