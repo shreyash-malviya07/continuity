@@ -1,211 +1,105 @@
-# Continuity 🩺
+Got it. For the **PPT/demo round**, you only need the simple user flow. You don't need to explain the implementation.
 
-**"Doctors see patients for minutes. Continuity remembers the days in between."**
+# Continuity — Prototype Usage Instructions
 
-A voice-first AI health companion for elderly people. Continuity records what a
-patient reports day-to-day between doctor visits, and turns it into a clear,
-honest longitudinal summary for the next appointment.
+### 1. Start the application
 
-## ⚠️ What this is NOT
-
-Continuity never diagnoses a disease, never prescribes or changes medicine,
-and never claims to verify that a medicine was physically taken. It only
-records and organizes what the patient says, in the patient's own words.
-
-## Status
-
-This repo currently has **Phase 1** built: a basic Streamlit UI shell with
-navigation between Home, Daily Check-in, Health Timeline, Doctor Report,
-Medicines, and Appointments. No database, AI, or voice yet — that comes in
-later phases.
-
----
-
-## STEP 1 — Install Python
-
-Check if you already have Python 3.10+ installed:
+Open Terminal:
 
 ```bash
-python3 --version
-```
-
-If you don't have it, download it from https://www.python.org/downloads/
-(any 3.10 or newer works).
-
-## STEP 2 — Create the project folder
-
-If you're starting from the files provided, just `cd` into the `continuity`
-folder you downloaded. If you're starting fresh:
-
-```bash
-mkdir continuity
-cd continuity
-```
-
-## STEP 3 — Create a virtual environment
-
-```bash
-python3 -m venv venv
-source venv/bin/activate        # Mac/Linux
-venv\Scripts\activate           # Windows
-```
-
-You'll know it worked because your terminal prompt now starts with `(venv)`.
-
-## STEP 4 — Install dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-## STEP 5 — Files
-
-For Phase 1 you should have:
-
-```
-continuity/
-├── app.py
-├── requirements.txt
-├── README.md
-├── .env.example
-├── .gitignore
-└── data/
-    └── .gitkeep
-```
-
-## STEP 6 — Environment variables
-
-Phase 4 needs an Anthropic API key for AI extraction. Create your `.env`:
-
-```bash
-cp .env.example .env
-```
-
-Then open `.env` and fill in:
-
-```
-LLM_API_KEY=sk-ant-...your key here...
-```
-
-Get a key from https://console.anthropic.com/settings/keys if you don't
-have one. **If you don't set this, the app still works** — it automatically
-falls back to the Phase 3 step-by-step questions instead of crashing.
-
-Phase 5 (semantic memory) can optionally use Qdrant:
-
-```
-QDRANT_URL=http://localhost:6333
-QDRANT_API_KEY=
-```
-
-**If you leave `QDRANT_URL` blank, the app still works** — it automatically
-falls back to storing embeddings locally in SQLite and computing similarity
-itself. You do NOT need to install or run Qdrant to demo this feature.
-
-If you do want real Qdrant, the easiest way is Docker:
-```bash
-docker run -p 6333:6333 qdrant/qdrant
-```
-Then set `QDRANT_URL=http://localhost:6333` in `.env`.
-
-## How Qdrant is used
-
-`services/memory_service.py` embeds each health event's symptom + what the
-patient said (locally, via `sentence-transformers` — no API key needed) and
-stores that vector either in a Qdrant collection called `health_events`
-(if `QDRANT_URL` is set and reachable) or in a local SQLite table
-(`event_embedding`) as a fallback. Either way, `find_related_events()`
-retrieves the closest matches by cosine similarity, so entries like "my
-knee is acting up" and "my leg is sore again" surface as related on the
-Health Timeline, without ever falsely merging unrelated symptoms.
-
-The first time you run a check-in, `sentence-transformers` downloads a
-small model (~80MB) — this needs internet access once, then it's cached
-locally.
-
-## STEP 7 — Run the app
-
-```bash
+cd ~/Downloads/continuity
+source venv/bin/activate
 streamlit run app.py
 ```
 
-This opens the app in your browser (usually `http://localhost:8501`).
+Open the URL shown in the terminal, usually:
 
-## STEP 8 — What to check right now
-
-- Sidebar navigation switches between the 6 pages
-- Home page shows the greeting, a disabled microphone button, and synthetic
-  "next medicine" / "next appointment" info
-- Nothing crashes, no errors in the terminal
-
-Once you confirm this works, tell me and we'll move to **Phase 2** (SQLite
-database for patient profile + health events).
+```text
+http://localhost:8501
+```
 
 ---
 
-## Setting up Git and pushing to GitHub
+### 2. Create the patient profile
 
-## STEP 9 — Initialize Git locally
+Go to **Patient Profile**.
 
-From inside the `continuity` folder:
+Enter the basic patient details and save the profile.
 
-```bash
-git init
-git add .
-git commit -m "Phase 1: basic Streamlit UI shell"
-```
-
-## STEP 10 — Create a GitHub repo
-
-1. Go to https://github.com/new
-2. Name it `continuity` (or whatever you like)
-3. Leave it **empty** — don't check "Add a README" (you already have one)
-4. Click **Create repository**
-
-## STEP 11 — Connect and push
-
-GitHub will show you a remote URL like
-`https://github.com/YOUR_USERNAME/continuity.git`. Use it here:
-
-```bash
-git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/continuity.git
-git push -u origin main
-```
-
-## STEP 12 — Ongoing workflow
-
-After each phase, from the `continuity` folder:
-
-```bash
-git add .
-git commit -m "Phase X: short description of what changed"
-git push
-```
-
-`.gitignore` already keeps `.env`, the local database, and virtual
-environment folders out of the repo, so it's safe to `git add .` freely —
-just double-check `git status` before committing if you're ever unsure.
+You only need to do this once for the demo.
 
 ---
 
-## Roadmap (later phases)
+### 3. Daily Check-in
 
-| Phase | What it adds |
-|---|---|
-| 2 | SQLite patient profile + health events |
-| 3 | Text-based daily check-in |
-| 4 | AI extraction of structured health events |
-| 5 | Qdrant semantic memory (with SQLite fallback) |
-| 6 | Voice input (browser speech recognition or Whisper) |
-| 7 | Voice output (Rime, with browser TTS fallback) |
-| 8 | Medicine reminders |
-| 9 | Doctor-ready longitudinal report |
-| 10 | "Load Shanti Demo" + "Simulate Next Appointment" demo mode |
+Go to **Daily Check-in**.
 
-## Medical safety limitations
+Describe your current condition naturally in one sentence.
 
-Continuity is a patient-reported symptom log, not a medical device. It does
-not diagnose, does not recommend treatment, and does not verify medication
-adherence — it only records what the patient says they experienced or did.
-All reports are for the patient and doctor to interpret together.
+For example:
+
+> My knee is hurting today and the pain is around 7 out of 10.
+
+Click **Send**.
+
+---
+
+### 4. Review and confirm
+
+The application will show you a summary of what you entered.
+
+Check whether the information is correct.
+
+Click **Confirm** to save the health event.
+
+---
+
+### 5. Check Health Timeline
+
+Go to **Health Timeline**.
+
+You should see your recently recorded health event along with previous events.
+
+For a good demo, create a few different entries, for example:
+
+**Day 1**
+
+> My knee hurts today.
+
+**Day 2**
+
+> My knee is hurting again and it is worse after walking.
+
+**Day 3**
+
+> My leg feels sore today.
+
+Then show how these events appear together in the timeline.
+
+---
+
+### 6. Demonstrate the main idea
+
+For your PPT/demo, the story is simply:
+
+```text
+Patient
+   ↓
+Daily Check-in
+   ↓
+Describe symptoms naturally
+   ↓
+Review information
+   ↓
+Confirm
+   ↓
+Health Timeline
+   ↓
+Previous health history is preserved
+```
+
+### 🎤 One-line explanation for your presentation
+
+> **"Continuity allows users to record their health experiences naturally and maintains a continuous, organized health history over time."**
+
+That's enough for the prototype round. **Don't spend time setting up the remaining phases right now.** Focus on making this flow work smoothly for your demo.
