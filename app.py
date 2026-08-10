@@ -1,12 +1,15 @@
 """
 CONTINUITY - Voice-first AI health companion for elderly people.
 
-PHASE 2: SQLite-backed patient profile + health events.
-The patient profile is now real (stored in data/continuity.db) and you can
-edit it. Health events have a real table too - Phase 2 includes a temporary
-manual entry form so you can test storage before Phase 3/4 build the real
-AI-driven check-in.
+PHASE 3: text-based daily check-in conversation.
+The patient now goes through a real question-by-question conversation
+(feeling -> symptom -> severity -> associated issue -> time of day ->
+confirm), and nothing is saved until they confirm the summary is correct.
+This is still rule-based, not AI - Phase 4 replaces the structured
+questions with real extraction from free-form text.
 """
+
+import datetime
 
 import streamlit as st
 
@@ -19,6 +22,16 @@ from database.db import (
     get_all_health_events,
 )
 from models.schemas import Patient, HealthEvent
+from services.checkin_service import (
+    CheckinState,
+    new_checkin,
+    submit_feeling,
+    submit_symptom,
+    submit_severity,
+    submit_associated,
+    submit_time,
+    confirm_edit,
+)
 
 # ----------------------------------------------------------------
 # Page config - do this first, before any other st.* call
@@ -129,39 +142,87 @@ def home_page():
 
 def daily_checkin_page():
     st.title("Daily Check-in")
-    st.info("The real AI-driven conversation check-in comes in Phase 3 "
-            "(text) and Phase 4 (structured extraction). For now, use the "
-            "manual test form below to confirm events save to the database.")
 
-    with st.form("manual_event_form"):
-        st.caption("Temporary manual entry — for testing Phase 2 storage only.")
-        date = st.text_input("Date (YYYY-MM-DD)", placeholder="2026-08-10")
-        symptom = st.text_input("Symptom", placeholder="knee pain")
-        severity = st.slider("Severity (1-10, optional)", 0, 10, 0,
-                              help="Leave at 0 if no severity was reported")
-        associated = st.text_input("Associated issue (optional)",
-                                    placeholder="difficulty walking")
-        time_of_day = st.selectbox("Time of day (optional)",
-                                    ["", "morning", "afternoon", "evening", "night"])
-        raw_text = st.text_area("What the patient said",
-                                 placeholder="My knee is hurting again today.")
+    if "checkin" not in st.session_state:
+        st.session_state.checkin = new_checkin()
+    state: CheckinState = st.session_state.checkin
 
-        submitted = st.form_submit_button("Save event")
-        if submitted:
-            if not date or not symptom:
-                st.error("Date and symptom are required.")
-            else:
+    # Render conversation so far as chat bubbles
+    for role, text in state.history:
+        with st.chat_message("assistant" if role == "ai" else "user"):
+            st.write(text)
+
+    # Render the input for whichever step we're on
+    if state.step == "feeling":
+        with st.form("feeling_form"):
+            text = st.text_area("Your answer", placeholder=(
+                "e.g. My knee is hurting again today, around a 7 out of 10, "
+                "and I had difficulty walking this morning."
+            ))
+            if st.form_submit_button("Send") and text.strip():
+                submit_feeling(state, text)
+                st.rerun()
+
+    elif state.step == "symptom":
+        with st.form("symptom_form"):
+            text = st.text_input("Your answer", placeholder="knee pain")
+            if st.form_submit_button("Send") and text.strip():
+                submit_symptom(state, text)
+                st.rerun()
+
+    elif state.step == "severity":
+        with st.form("severity_form"):
+            severity = st.slider("Severity (0 = not applicable)", 0, 10, 0)
+            if st.form_submit_button("Send"):
+                submit_severity(state, severity)
+                st.rerun()
+
+    elif state.step == "associated":
+        with st.form("associated_form"):
+            text = st.text_input("Your answer (optional)",
+                                  placeholder="difficulty walking")
+            if st.form_submit_button("Send"):
+                submit_associated(state, text)
+                st.rerun()
+
+    elif state.step == "time":
+        with st.form("time_form"):
+            time_of_day = st.selectbox(
+                "Your answer (optional)",
+                ["", "morning", "afternoon", "evening", "night"],
+            )
+            if st.form_submit_button("Send"):
+                submit_time(state, time_of_day)
+                st.rerun()
+
+    elif state.step == "confirm":
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("✅ Confirm"):
                 event = HealthEvent(
-                    id=None, date=date, symptom=symptom,
-                    severity=severity if severity > 0 else None,
-                    associated_issue=associated or None,
-                    time_of_day=time_of_day or None,
+                    id=None,
+                    date=datetime.date.today().isoformat(),
+                    symptom=state.symptom,
+                    severity=state.severity if state.severity > 0 else None,
+                    associated_issue=state.associated_issue or None,
+                    time_of_day=state.time_of_day or None,
                     source="patient_reported",
-                    raw_text=raw_text,
+                    raw_text=state.feeling_text,
                 )
                 add_health_event(event)
-                st.success(f"Saved: {symptom} on {date}")
+                st.session_state.checkin = new_checkin()
+                st.success("Recorded. Thank you.")
                 st.rerun()
+        with col2:
+            if st.button("✏️ Edit"):
+                confirm_edit(state)
+                st.rerun()
+
+    if state.history:
+        st.divider()
+        if st.button("Start a new check-in"):
+            st.session_state.checkin = new_checkin()
+            st.rerun()
 
 
 def timeline_page():
@@ -221,4 +282,4 @@ PAGE_FUNCS = {
 PAGE_FUNCS[page]()
 
 st.sidebar.divider()
-st.sidebar.caption("Continuity — Phase 2: real patient + event storage (SQLite).")
+st.sidebar.caption("Continuity — Phase 3: text-based daily check-in conversation.")
